@@ -65,10 +65,17 @@ const setupSocket = (io) => {
     });
 
     socket.on('cliente:seguir_operador', ({ operadorId }) => {
-      socket.join(`siguiendo:${operadorId}`);
-      const info = operadoresActivos.get(operadorId);
-      if (info?.lat) socket.emit('operador:ubicacion_update', { operadorId, lat: info.lat, lng: info.lng });
-    });
+  socket.join(`siguiendo:${operadorId}`);
+  const info = operadoresActivos.get(operadorId);
+  if (info?.lat) socket.emit('operador:ubicacion_update', { operadorId, lat: info.lat, lng: info.lng });
+});
+
+socket.on('cliente:pedir_ubicacion', ({ operadorId }) => {
+  const info = operadoresActivos.get(operadorId);
+  if (info?.lat) {
+    socket.emit('operador:ubicacion_update', { operadorId, lat: info.lat, lng: info.lng });
+  }
+});
 
     socket.on('cliente:dejar_seguir', ({ operadorId }) => socket.leave(`siguiendo:${operadorId}`));
 

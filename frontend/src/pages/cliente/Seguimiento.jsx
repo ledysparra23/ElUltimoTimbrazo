@@ -39,8 +39,9 @@ export default function ClienteSeguimiento() {
   useEffect(() => {
     if (!socket || !selectedOp) return;
     socket.emit('cliente:seguir_operador', { operadorId: selectedOp });
+    socket.emit('cliente:pedir_ubicacion', { operadorId: selectedOp });
 
-    const handleUpdate = ({ operadorId, lat, lng }) => {
+const handleUpdate = ({ operadorId, lat, lng }) => {
       if (operadorId !== selectedOp) return;
       setOpUbicacion({ lat, lng });
       if (!googleMapRef.current) return;
