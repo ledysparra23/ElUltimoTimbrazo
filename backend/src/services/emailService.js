@@ -22,3 +22,5 @@ const sendOTPEmail = async (email, nombre) => {
   }
   return code;
 };
+
+module.exports = { sendOTPEmail, verifyOTP, clearOTP };
