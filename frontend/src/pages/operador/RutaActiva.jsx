@@ -168,21 +168,39 @@ export default function RutaActiva() {
         });
       });
 
-      if (puntos.length >= 2 && window.google.maps.DirectionsService) {
-        const ds = new window.google.maps.DirectionsService();
-        const dr = new window.google.maps.DirectionsRenderer({
-          map: googleMapRef.current, suppressMarkers: true,
-          polylineOptions: { strokeColor: '#1d5bdb', strokeWeight: 4, strokeOpacity: 0.7 },
-        });
-        const waypoints = puntos.slice(1, -1).map(p => ({
-          location: { lat: parseFloat(p.lat), lng: parseFloat(p.lng) }, stopover: true,
-        }));
-        ds.route({
-          origin: { lat: parseFloat(puntos[0].lat), lng: parseFloat(puntos[0].lng) },
-          destination: { lat: parseFloat(puntos[puntos.length - 1].lat), lng: parseFloat(puntos[puntos.length - 1].lng) },
-          waypoints, travelMode: window.google.maps.TravelMode.DRIVING,
-        }, (result, status) => { if (status === 'OK') dr.setDirections(result); });
-      }
+    const puntosConCoords = puntos.filter(p => p.lat && p.lng);
+
+if (puntosConCoords.length >= 2 && window.google.maps.DirectionsService) {
+  const ds = new window.google.maps.DirectionsService();
+  const dr = new window.google.maps.DirectionsRenderer({
+    map: googleMapRef.current, suppressMarkers: true,
+    polylineOptions: { strokeColor: '#1d5bdb', strokeWeight: 4, strokeOpacity: 0.7 },
+  });
+  const origin = puntosConCoords[0];
+  const destination = puntosConCoords[puntosConCoords.length - 1];
+  const middle = puntosConCoords.slice(1, -1).slice(0, 23);
+  const waypoints = middle.map(p => ({
+    location: { lat: parseFloat(p.lat), lng: parseFloat(p.lng) }, stopover: true,
+  }));
+  ds.route({
+    origin: { lat: parseFloat(origin.lat), lng: parseFloat(origin.lng) },
+    destination: { lat: parseFloat(destination.lat), lng: parseFloat(destination.lng) },
+    waypoints,
+    optimizeWaypoints: true,
+    travelMode: window.google.maps.TravelMode.DRIVING,
+  }, (result, status) => {
+    if (status === 'OK') {
+      dr.setDirections(result);
+    } else {
+      console.warn('Directions API status:', status);
+      new window.google.maps.Polyline({
+        path: puntosConCoords.map(p => ({ lat: parseFloat(p.lat), lng: parseFloat(p.lng) })),
+        map: googleMapRef.current,
+        strokeColor: '#1d5bdb', strokeWeight: 3, strokeOpacity: 0.5,
+      });
+    }
+  });
+}
     };
 
     if (window.google?.maps) initMap();

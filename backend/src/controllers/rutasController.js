@@ -36,11 +36,38 @@ const getRutas = async (req, res) => {
       ORDER BY r.creado_en DESC
     `, params);
 
-    return res.json(result.rows.map(r => ({
+    // Include puntos_parada for each ruta
+    const rutas = result.rows;
+    const rutaIds = rutas.map(r => r.id);
+
+    let puntosMap = {};
+    if (rutaIds.length > 0) {
+      const puntosRes = await db.query(`
+        SELECT p.*, cu.nombre AS cliente_nombre, cu.apellido AS cliente_apellido, cl.telefono AS cliente_telefono
+        FROM puntos_parada p
+        LEFT JOIN clientes cl ON cl.id = p.cliente_id
+        LEFT JOIN users cu ON cu.id = cl.user_id
+        WHERE p.ruta_id = ANY($1::uuid[])
+        ORDER BY p.orden ASC
+      `, [rutaIds]);
+      puntosRes.rows.forEach(p => {
+        if (!puntosMap[p.ruta_id]) puntosMap[p.ruta_id] = [];
+        puntosMap[p.ruta_id].push({
+          ...p,
+          clientes: p.cliente_nombre ? {
+            telefono: p.cliente_telefono,
+            users: { nombre: p.cliente_nombre, apellido: p.cliente_apellido }
+          } : null
+        });
+      });
+    }
+
+    return res.json(rutas.map(r => ({
       ...r,
       operadores: { users: { nombre: r.op_nombre, apellido: r.op_apellido }, vehiculo_placa: r.vehiculo_placa, estado: r.op_estado },
       zonas: { nombre: r.zona_nombre },
-      ciclos_recoleccion: { nombre: r.ciclo_nombre, fecha: r.ciclo_fecha }
+      ciclos_recoleccion: { nombre: r.ciclo_nombre, fecha: r.ciclo_fecha },
+      puntos_parada: puntosMap[r.id] || []
     })));
   } catch (err) {
     console.error(err);

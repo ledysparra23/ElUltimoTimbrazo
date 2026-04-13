@@ -64,7 +64,7 @@ export default function ClienteSeguimiento() {
   }, [socket, selectedOp]);
 
   const opNombre = (op) => `${op.users?.nombre || ''} ${op.users?.apellido || ''}`.trim();
-  const activos = operadores.filter(o => o.estado === 'en_ruta');
+  const activos = operadores;
 
   return (
     <div>
