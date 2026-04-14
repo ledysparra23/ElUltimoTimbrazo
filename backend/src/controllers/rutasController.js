@@ -208,11 +208,18 @@ const actualizarPunto = async (req, res) => {
     const puntoRes = await db.query(query, params);
     const punto = puntoRes.rows[0];
 
-    // Actualizar paquete asociado
-    const estadoPaquete = estado === 'visitado' ? 'entregado' : estado === 'omitido' ? 'no_entregado' : 'en_transito';
+    // Double confirmation: operador marks visitado → paquete waits for client confirmation
+    // omitido → no_entregado (auto-reagendar later)
+    const estadoPaquete = estado === 'visitado'
+      ? 'pendiente_confirmacion'
+      : estado === 'omitido' ? 'no_entregado' : 'en_transito';
+
+    // Update paquete also with foto_evidencia
     await db.query(
-      `UPDATE paquetes SET estado = $1, estado_actualizado_en = NOW() WHERE punto_parada_id = $2`,
-      [estadoPaquete, puntoId]
+      `UPDATE paquetes SET estado = $1, estado_actualizado_en = NOW(),
+        foto_evidencia = COALESCE($3, foto_evidencia)
+       WHERE punto_parada_id = $2`,
+      [estadoPaquete, puntoId, foto_evidencia || null]
     );
 
     // Notificar al cliente si existe
@@ -221,13 +228,13 @@ const actualizarPunto = async (req, res) => {
       const userId = clienteRes.rows[0]?.user_id;
       if (userId) {
         const mensaje = estado === 'visitado'
-          ? 'Tu paquete ha sido entregado exitosamente.'
+          ? '¡Tu paquete fue entregado! Por favor confirma la recepción desde tu panel.'
           : `Tu punto de entrega fue omitido. Motivo: ${motivo_omision}`;
+        const titulo = estado === 'visitado' ? '📦 Confirma tu entrega' : '⚠️ Punto omitido';
         await db.query(
           `INSERT INTO notificaciones (user_id, tipo, titulo, mensaje) VALUES ($1, $2, $3, $4)`,
-          [userId, `punto_${estado}`, estado === 'visitado' ? '✅ Entrega completada' : '⚠️ Punto omitido', mensaje]
+          [userId, `punto_${estado}`, titulo, mensaje]
         );
-        // Emit socket to client in real time
         if (_io) {
           _io.to(`cliente:${userId}`).emit('paquete:actualizado', { puntoId, estado, mensaje });
         }

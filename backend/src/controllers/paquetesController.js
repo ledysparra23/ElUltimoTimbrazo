@@ -5,17 +5,32 @@ const { v4: uuidv4 } = require('uuid');
 const registrarPaquete = async (req, res) => {
   try {
     const {
-      cliente_id, descripcion, peso, dimensiones,
+      cliente_id, cliente_email, descripcion, peso, dimensiones,
       punto_parada_id, tipo_ingreso = 'admin'
     } = req.body;
 
-    if (!cliente_id || !descripcion)
-      return res.status(400).json({ error: 'cliente_id y descripcion son requeridos' });
+    if (!descripcion) return res.status(400).json({ error: 'descripcion es requerida' });
 
-    // Verificar que el cliente existe
-    const clienteRes = await db.query('SELECT id, user_id FROM clientes WHERE id = $1', [cliente_id]);
-    if (!clienteRes.rows[0])
-      return res.status(404).json({ error: 'Cliente no encontrado' });
+    let clienteDbId = cliente_id;
+    let clienteUserId = null;
+
+    if (cliente_email && !cliente_id) {
+      const userRes = await db.query(
+        'SELECT u.id AS user_id, c.id AS cliente_id FROM users u LEFT JOIN clientes c ON c.user_id = u.id WHERE u.email = $1',
+        [cliente_email.toLowerCase().trim()]
+      );
+      if (!userRes.rows[0]) return res.status(404).json({ error: 'No existe un usuario con ese correo' });
+      if (!userRes.rows[0].cliente_id) return res.status(404).json({ error: 'El usuario no tiene perfil de cliente' });
+      clienteDbId = userRes.rows[0].cliente_id;
+      clienteUserId = userRes.rows[0].user_id;
+    } else if (cliente_id) {
+      const clienteRes = await db.query('SELECT id, user_id FROM clientes WHERE id = $1', [cliente_id]);
+      if (!clienteRes.rows[0]) return res.status(404).json({ error: 'Cliente no encontrado' });
+      clienteDbId = clienteRes.rows[0].id;
+      clienteUserId = clienteRes.rows[0].user_id;
+    } else {
+      return res.status(400).json({ error: 'Debes proveer cliente_id o cliente_email' });
+    }
 
     const codigo_seguimiento = 'PKT-' + Date.now().toString(36).toUpperCase();
 
@@ -25,22 +40,24 @@ const registrarPaquete = async (req, res) => {
           punto_parada_id, estado, registrado_por, tipo_ingreso)
        VALUES ($1, $2, $3, $4, $5, $6, 'registrado', $7, $8)
        RETURNING *`,
-      [cliente_id, codigo_seguimiento, descripcion, peso || null,
+      [clienteDbId, codigo_seguimiento, descripcion, peso || null,
        dimensiones || null, punto_parada_id || null,
        req.user.id, tipo_ingreso]
     );
     const paquete = result.rows[0];
 
     // Notificar al cliente
-    await db.query(
-      `INSERT INTO notificaciones (user_id, tipo, titulo, mensaje, datos_extra)
-       VALUES ($1, 'paquete_registrado', '📦 Nuevo paquete registrado', $2, $3)`,
-      [
-        clienteRes.rows[0].user_id,
-        `Se registró un nuevo paquete: ${descripcion}. Código: ${codigo_seguimiento}`,
-        JSON.stringify({ paquete_id: paquete.id, codigo: codigo_seguimiento })
-      ]
-    );
+    if (clienteUserId) {
+      await db.query(
+        `INSERT INTO notificaciones (user_id, tipo, titulo, mensaje, datos_extra)
+         VALUES ($1, 'paquete_registrado', '📦 Nuevo paquete registrado', $2, $3)`,
+        [
+          clienteUserId,
+          `Se registró un nuevo paquete: ${descripcion}. Código: ${codigo_seguimiento}`,
+          JSON.stringify({ paquete_id: paquete.id, codigo: codigo_seguimiento })
+        ]
+      );
+    }
 
     return res.status(201).json({ message: 'Paquete registrado', paquete });
   } catch (err) {
@@ -340,7 +357,8 @@ module.exports = {
   registrarPaquete, actualizarEstadoPaquete, listarPaquetes, misPaquetes,
   getCorresponsales, crearSolicitudRecogida, misSolicitudes,
   todasSolicitudes, actualizarSolicitud, asignarSolicitudAOperador,
-  misSolicitudesAsignadas, responderSolicitud, vincularPaqueteARuta
+  misSolicitudesAsignadas, responderSolicitud, vincularPaqueteARuta,
+  confirmarRecepcion
 };
 
 // ── Admin: vincular paquete existente a una ruta ──────────────────────
@@ -443,4 +461,38 @@ async function responderSolicitud(req, res) {
     }
     return res.json({ message: `Solicitud ${accion === 'aceptar' ? 'aceptada' : 'rechazada'} exitosamente` });
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Error al responder solicitud' }); }
+}
+
+// ── Cliente: confirmar recepción de paquete ───────────────────────────
+async function confirmarRecepcion(req, res) {
+  try {
+    const { id } = req.params;
+    // Get cliente_id for this user
+    const clRes = await db.query('SELECT id FROM clientes WHERE user_id = $1', [req.user.id]);
+    if (!clRes.rows[0]) return res.status(404).json({ error: 'Perfil cliente no encontrado' });
+
+    const paqRes = await db.query(
+      `SELECT * FROM paquetes WHERE id = $1 AND cliente_id = $2 AND estado = 'pendiente_confirmacion'`,
+      [id, clRes.rows[0].id]
+    );
+    if (!paqRes.rows[0]) return res.status(404).json({ error: 'Paquete no encontrado o no está esperando confirmación' });
+
+    await db.query(
+      `UPDATE paquetes SET estado = 'entregado', estado_actualizado_en = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    // Notify admin
+    const adminRes = await db.query("SELECT id FROM users WHERE rol = 'admin' LIMIT 1");
+    if (adminRes.rows[0]) {
+      await db.query(
+        `INSERT INTO notificaciones (user_id, tipo, titulo, mensaje) VALUES ($1, 'entrega_confirmada', '✅ Entrega confirmada por cliente', $2)`,
+        [adminRes.rows[0].id, `El cliente confirmó la recepción del paquete ${paqRes.rows[0].codigo_seguimiento}`]
+      );
+    }
+    return res.json({ message: 'Recepción confirmada. ¡Gracias!' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al confirmar recepción' });
+  }
 }

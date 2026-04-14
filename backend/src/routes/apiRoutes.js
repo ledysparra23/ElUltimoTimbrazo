@@ -4,7 +4,8 @@ const auth = require('../middleware/auth');
 const {
   getUsers, getOperadores, getClientes,
   getZonas, crearZona, toggleUser,
-  getMisNotificaciones, marcarLeida, updateSettings, updateProfile
+  getMisNotificaciones, marcarLeida, marcarTodasLeidas, updateSettings, updateProfile,
+  updateUser, deleteUser
 } = require('../controllers/usersController');
 const { getCiclos, crearCiclo, actualizarCiclo } = require('../controllers/ciclosController');
 const { getOperadoresActivos } = require('../socket/socketHandler');
@@ -12,12 +13,15 @@ const {
   registrarPaquete, actualizarEstadoPaquete, listarPaquetes, misPaquetes,
   getCorresponsales, crearSolicitudRecogida, misSolicitudes,
   todasSolicitudes, actualizarSolicitud, asignarSolicitudAOperador,
-  misSolicitudesAsignadas, responderSolicitud, vincularPaqueteARuta
+  misSolicitudesAsignadas, responderSolicitud, vincularPaqueteARuta,
+  confirmarRecepcion
 } = require('../controllers/paquetesController');
 
 // ── Admin: usuarios ───────────────────────────────────────────────────
 router.get('/admin/users', auth(['admin']), getUsers);
 router.patch('/admin/users/:id/toggle', auth(['admin']), toggleUser);
+router.patch('/admin/users/:id', auth(['admin']), updateUser);
+router.delete('/admin/users/:id', auth(['admin']), deleteUser);
 router.get('/admin/operadores', auth(['admin']), getOperadores);
 router.get('/admin/clientes', auth(['admin']), getClientes);
 router.get('/admin/zonas', auth(['admin']), getZonas);
@@ -42,13 +46,16 @@ router.post('/admin/solicitudes/:id/asignar', auth(['admin']), asignarSolicitudA
 
 // ── Operador ──────────────────────────────────────────────────────────
 router.get('/operador/notificaciones', auth(['operador']), getMisNotificaciones);
+router.patch('/operador/notificaciones/todas-leidas', auth(['operador']), marcarTodasLeidas);
 router.patch('/operador/notificaciones/:id/leida', auth(['operador']), marcarLeida);
 router.get('/operador/solicitudes', auth(['operador']), misSolicitudesAsignadas);
 router.post('/operador/solicitudes/:id/responder', auth(['operador']), responderSolicitud);
 
 // ── Cliente ───────────────────────────────────────────────────────────
 router.get('/cliente/paquetes', auth(['cliente']), misPaquetes);
+router.post('/cliente/paquetes/:id/confirmar', auth(['cliente']), confirmarRecepcion);
 router.get('/cliente/notificaciones', auth(['cliente']), getMisNotificaciones);
+router.patch('/cliente/notificaciones/todas-leidas', auth(['cliente']), marcarTodasLeidas);
 router.patch('/cliente/notificaciones/:id/leida', auth(['cliente']), marcarLeida);
 router.get('/cliente/solicitudes', auth(['cliente']), misSolicitudes);
 router.post('/cliente/solicitudes', auth(['cliente']), crearSolicitudRecogida);

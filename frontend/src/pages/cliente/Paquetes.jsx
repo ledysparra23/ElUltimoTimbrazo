@@ -3,14 +3,15 @@ import axios from 'axios';
 import { useSocket } from '../../context/SocketContext';
 
 const ESTADO_CONFIG = {
-  registrado:       { badge: 'badge-gray',   icon: '📋', label: 'Registrado',       desc: 'Tu paquete fue registrado en el sistema.' },
-  en_bodega:        { badge: 'badge-blue',   icon: '🏭', label: 'En bodega',         desc: 'Tu paquete está en la bodega de clasificación.' },
-  asignado_a_ruta:  { badge: 'badge-blue',   icon: '📌', label: 'Asignado a ruta',   desc: 'Tu paquete fue asignado a un operador.' },
-  en_transito:      { badge: 'badge-yellow', icon: '🚚', label: 'En tránsito',       desc: 'Tu paquete está en camino hacia ti.' },
-  entregado:        { badge: 'badge-green',  icon: '✅', label: 'Entregado',         desc: 'Tu paquete fue entregado exitosamente.' },
-  no_entregado:     { badge: 'badge-red',    icon: '❌', label: 'No entregado',      desc: 'No pudimos entregar tu paquete.' },
-  reagendado:       { badge: 'badge-orange', icon: '🔄', label: 'Reagendado',        desc: 'Tu entrega fue reprogramada para otro ciclo.' },
-  devuelto:         { badge: 'badge-red',    icon: '↩️', label: 'Devuelto',          desc: 'Tu paquete fue devuelto al remitente.' },
+  registrado:              { badge: 'badge-gray',   icon: '📋', label: 'Registrado',            desc: 'Tu paquete fue registrado en el sistema.' },
+  en_bodega:               { badge: 'badge-blue',   icon: '🏭', label: 'En bodega',              desc: 'Tu paquete está en la bodega de clasificación.' },
+  asignado_a_ruta:         { badge: 'badge-blue',   icon: '📌', label: 'Asignado a ruta',        desc: 'Tu paquete fue asignado a un operador.' },
+  en_transito:             { badge: 'badge-yellow', icon: '🚚', label: 'En tránsito',            desc: 'Tu paquete está en camino hacia ti.' },
+  pendiente_confirmacion:  { badge: 'badge-orange', icon: '🔔', label: '¡Confirma tu entrega!',  desc: 'El operador marcó tu paquete como entregado. ¿Lo recibiste?' },
+  entregado:               { badge: 'badge-green',  icon: '✅', label: 'Entregado',              desc: 'Tu paquete fue entregado exitosamente.' },
+  no_entregado:            { badge: 'badge-red',    icon: '❌', label: 'No entregado',           desc: 'No pudimos entregar tu paquete.' },
+  reagendado:              { badge: 'badge-orange', icon: '🔄', label: 'Reagendado',             desc: 'Tu entrega fue reprogramada para otro ciclo.' },
+  devuelto:                { badge: 'badge-red',    icon: '↩️', label: 'Devuelto',              desc: 'Tu paquete fue devuelto al remitente.' },
 };
 
 const ESTADO_STEPS = ['registrado', 'en_bodega', 'asignado_a_ruta', 'en_transito', 'entregado'];
@@ -75,7 +76,7 @@ function EstadoTimeline({ estado }) {
   );
 }
 
-function PaqueteCard({ paquete, onExpand, expanded }) {
+function PaqueteCard({ paquete, onExpand, expanded, onConfirmar }) {
   const cfg = ESTADO_CONFIG[paquete.estado] || ESTADO_CONFIG.registrado;
 
   return (
@@ -182,6 +183,25 @@ function PaqueteCard({ paquete, onExpand, expanded }) {
               </div>
             </div>
           )}
+
+          {/* Double confirmation button */}
+          {paquete.estado === 'pendiente_confirmacion' && (
+            <div style={{ marginTop: 16, background: 'linear-gradient(135deg,#fffbeb,#fef3c7)', border: '2px solid #f59e0b', borderRadius: 10, padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, color: '#92400e' }}>
+                🔔 ¿Recibiste tu paquete?
+              </div>
+              <div style={{ fontSize: 13, color: '#78350f', marginBottom: 12, lineHeight: 1.6 }}>
+                El operador marcó este paquete como entregado. Si lo recibiste, confirma aquí para completar la entrega.
+              </div>
+              <button
+                className="btn btn-success"
+                style={{ width: '100%', padding: '11px' }}
+                onClick={() => onConfirmar(paquete.id)}
+              >
+                ✅ Sí, recibí mi paquete
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -192,6 +212,7 @@ export default function ClientePaquetes() {
   const [paquetes, setPaquetes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
+  const [msg, setMsg] = useState({ text: '', type: '' });
   const { socket } = useSocket();
 
   const fetchPaquetes = () => {
@@ -202,19 +223,30 @@ export default function ClientePaquetes() {
 
   useEffect(() => {
     fetchPaquetes();
-    // Real-time updates via socket
     if (socket) {
       socket.on('paquete:actualizado', fetchPaquetes);
       return () => socket.off('paquete:actualizado', fetchPaquetes);
     }
   }, [socket]);
 
-  // Auto-refresh every 30s
   useEffect(() => {
     const iv = setInterval(fetchPaquetes, 30000);
     return () => clearInterval(iv);
   }, []);
 
+  const confirmarRecepcion = async (id) => {
+    try {
+      await axios.post(`/api/cliente/paquetes/${id}/confirmar`);
+      setMsg({ text: '✅ ¡Entrega confirmada! Gracias por usar ElUltimoTimbraso.', type: 'success' });
+      setTimeout(() => setMsg({ text: '', type: '' }), 6000);
+      fetchPaquetes();
+    } catch (err) {
+      setMsg({ text: err.response?.data?.error || 'Error al confirmar', type: 'error' });
+      setTimeout(() => setMsg({ text: '', type: '' }), 4000);
+    }
+  };
+
+  const porConfirmar = paquetes.filter(p => p.estado === 'pendiente_confirmacion').length;
   const enTransito = paquetes.filter(p => p.estado === 'en_transito' || p.estado === 'asignado_a_ruta').length;
   const entregados = paquetes.filter(p => p.estado === 'entregado').length;
   const pendientes = paquetes.filter(p => p.estado === 'registrado' || p.estado === 'en_bodega').length;
@@ -227,6 +259,14 @@ export default function ClientePaquetes() {
         <h1 className="page-title">Mis paquetes</h1>
         <button className="btn btn-secondary btn-sm" onClick={fetchPaquetes}>🔄 Actualizar</button>
       </div>
+
+      {msg.text && <div className={`alert alert-${msg.type === 'error' ? 'error' : 'success'}`} style={{ marginBottom: 16 }}>{msg.text}</div>}
+
+      {porConfirmar > 0 && (
+        <div className="alert" style={{ background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#92400e', fontWeight: 600 }}>
+          🔔 Tienes {porConfirmar} paquete{porConfirmar > 1 ? 's' : ''} esperando tu confirmación de recepción. ¡Revísalo abajo!
+        </div>
+      )}
 
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
         <div className="stat-card">
@@ -249,17 +289,13 @@ export default function ClientePaquetes() {
         </div>
       ) : (
         <div>
-          {enTransito > 0 && (
-            <div className="alert alert-info">
-              🚚 Tienes {enTransito} paquete{enTransito > 1 ? 's' : ''} en camino hacia ti.
-            </div>
-          )}
           {paquetes.map(p => (
             <PaqueteCard
               key={p.id}
               paquete={p}
               expanded={expanded === p.id}
               onExpand={() => setExpanded(expanded === p.id ? null : p.id)}
+              onConfirmar={confirmarRecepcion}
             />
           ))}
         </div>

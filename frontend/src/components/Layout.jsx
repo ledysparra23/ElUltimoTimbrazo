@@ -12,6 +12,7 @@ const navItems = {
     { path: '/admin/ciclos', label: 'Ciclos', icon: '🔄' },
     { path: '/admin/operadores', label: 'Operadores', icon: '👷' },
     { path: '/admin/clientes', label: 'Clientes', icon: '👥' },
+    { path: '/admin/usuarios', label: 'Usuarios', icon: '🔑' },
     { path: '/admin/reporte', label: 'Reportes', icon: '📋' },
     { path: '/admin/settings', label: 'Ajustes', icon: '⚙️' },
   ],
@@ -19,6 +20,7 @@ const navItems = {
     { path: '/operador', label: 'Mi ruta hoy', icon: '📍', exact: true },
     { path: '/operador/mapa', label: 'Mi mapa', icon: '🗺️' },
     { path: '/operador/historial', label: 'Historial', icon: '📅' },
+    { path: '/operador/notificaciones', label: 'Notificaciones', icon: '🔔' },
     { path: '/operador/settings', label: 'Ajustes', icon: '⚙️' },
   ],
   cliente: [
@@ -26,6 +28,7 @@ const navItems = {
     { path: '/cliente/paquetes', label: 'Mis paquetes', icon: '📦' },
     { path: '/cliente/solicitudes', label: 'Solicitar recogida', icon: '📬' },
     { path: '/cliente/seguimiento', label: 'Seguimiento GPS', icon: '🔍' },
+    { path: '/cliente/notificaciones', label: 'Notificaciones', icon: '🔔' },
     { path: '/cliente/settings', label: 'Ajustes', icon: '⚙️' },
   ],
 };

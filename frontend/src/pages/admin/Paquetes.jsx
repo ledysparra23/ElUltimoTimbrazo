@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-
+ 
 export default function AdminPaquetes() {
   const [paquetes, setPaquetes] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -14,12 +14,12 @@ export default function AdminPaquetes() {
   const [showVincularModal, setShowVincularModal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ text: '', type: '' });
-  const [form, setForm] = useState({ cliente_id: '', descripcion: '', peso: '', dimensiones: '' });
+  const [form, setForm] = useState({ cliente_id: '', cliente_email: '', descripcion: '', peso: '', dimensiones: '' });
   const [estadoForm, setEstadoForm] = useState({ estado: '', foto_evidencia: '', notas: '' });
   const [asignarForm, setAsignarForm] = useState({ operador_id: '', notas_admin: '' });
   const [vincularForm, setVincularForm] = useState({ ruta_id: '', punto_parada_id: '' });
   const [puntosRuta, setPuntosRuta] = useState([]);
-
+ 
   const fetchAll = async () => {
     const [pkRes, clRes, solRes, opRes, rutasPendRes, rutasEncRes] = await Promise.all([
       axios.get('/api/admin/paquetes'),
@@ -36,27 +36,27 @@ export default function AdminPaquetes() {
     setRutas([...(rutasPendRes.data || []), ...(rutasEncRes.data || [])]);
     setLoading(false);
   };
-
+ 
   useEffect(() => { fetchAll(); }, []);
-
+ 
   const showMsg = (text, type) => {
     setMsg({ text, type });
     setTimeout(() => setMsg({ text: '', type: '' }), 4000);
   };
-
+ 
   const registrar = async (e) => {
     e.preventDefault();
     try {
       await axios.post('/api/admin/paquetes', form);
       showMsg('Paquete registrado. El cliente recibirá una notificación.', 'success');
       setShowModal(false);
-      setForm({ cliente_id: '', descripcion: '', peso: '', dimensiones: '' });
+      setForm({ cliente_id: '', cliente_email: '', descripcion: '', peso: '', dimensiones: '' });
       fetchAll();
     } catch (err) {
       showMsg(err.response?.data?.error || 'Error', 'error');
     }
   };
-
+ 
   const actualizarEstado = async (e) => {
     e.preventDefault();
     try {
@@ -68,12 +68,12 @@ export default function AdminPaquetes() {
       showMsg(err.response?.data?.error || 'Error', 'error');
     }
   };
-
+ 
   const actualizarSolicitud = async (id, estado) => {
     await axios.patch(`/api/admin/solicitudes/${id}`, { estado });
     fetchAll();
   };
-
+ 
   const asignarSolicitud = async () => {
     if (!asignarForm.operador_id) { showMsg('Selecciona un operador', 'error'); return; }
     try {
@@ -86,7 +86,7 @@ export default function AdminPaquetes() {
       showMsg(err.response?.data?.error || 'Error al asignar', 'error');
     }
   };
-
+ 
   const loadPuntosRuta = async (rutaId) => {
     if (!rutaId) { setPuntosRuta([]); return; }
     try {
@@ -102,7 +102,7 @@ export default function AdminPaquetes() {
       showMsg(err.response?.data?.error || 'Error al cargar puntos de la ruta', 'error');
     }
   };
-
+ 
   const vincularARuta = async () => {
     if (!vincularForm.ruta_id || !vincularForm.punto_parada_id) {
       showMsg('Selecciona ruta y punto de parada', 'error'); return;
@@ -121,7 +121,7 @@ export default function AdminPaquetes() {
       showMsg(err.response?.data?.error || 'Error al vincular', 'error');
     }
   };
-
+ 
   const estadoBadge = (e) => {
     const map = {
       registrado: 'badge-gray', en_bodega: 'badge-blue',
@@ -131,7 +131,7 @@ export default function AdminPaquetes() {
     };
     return map[e] || 'badge-gray';
   };
-
+ 
   const solBadge = (e) => {
     const map = {
       pendiente: 'badge-yellow', confirmada: 'badge-blue',
@@ -140,9 +140,9 @@ export default function AdminPaquetes() {
     };
     return map[e] || 'badge-gray';
   };
-
+ 
   if (loading) return <div className="loading">Cargando...</div>;
-
+ 
   return (
     <div>
       <div className="page-header">
@@ -153,11 +153,11 @@ export default function AdminPaquetes() {
           </button>
         )}
       </div>
-
+ 
       {msg.text && (
         <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`}>{msg.text}</div>
       )}
-
+ 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#fff', padding: '6px', borderRadius: 10, border: '1px solid var(--border)', width: 'fit-content' }}>
         {[
@@ -174,7 +174,7 @@ export default function AdminPaquetes() {
           </button>
         ))}
       </div>
-
+ 
       {/* Paquetes tab */}
       {tab === 'paquetes' && (
         <div className="card">
@@ -225,7 +225,7 @@ export default function AdminPaquetes() {
           </div>
         </div>
       )}
-
+ 
       {/* Solicitudes tab */}
       {tab === 'solicitudes' && (
         <div className="card">
@@ -285,8 +285,7 @@ export default function AdminPaquetes() {
           </div>
         </div>
       )}
-                    
-
+ 
       {/* Modal registrar paquete */}
       {showModal && (
         <div className="modal-overlay">
@@ -300,9 +299,21 @@ export default function AdminPaquetes() {
             </p>
             <form onSubmit={registrar}>
               <div className="form-group">
-                <label className="form-label">Cliente *</label>
+                <label className="form-label">Buscar cliente por correo</label>
+                <input className="form-input" type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={form.cliente_email}
+                  onChange={e => setForm(f => ({ ...f, cliente_email: e.target.value, cliente_id: '' }))}
+                />
+                <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>
+                  Ingresa el correo del cliente para asociar el paquete automáticamente a su cuenta
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)', margin: '4px 0 12px' }}>— o selecciona de la lista —</div>
+              <div className="form-group">
+                <label className="form-label">Cliente (lista)</label>
                 <select className="form-input" value={form.cliente_id}
-                  onChange={e => setForm(f => ({ ...f, cliente_id: e.target.value }))} required>
+                  onChange={e => setForm(f => ({ ...f, cliente_id: e.target.value, cliente_email: '' }))}>
                   <option value="">Seleccionar cliente</option>
                   {clientes.map(c => (
                     <option key={c.id} value={c.id}>{c.users?.nombre} {c.users?.apellido} — {c.users?.email}</option>
@@ -335,7 +346,7 @@ export default function AdminPaquetes() {
           </div>
         </div>
       )}
-
+ 
       {/* Modal actualizar estado */}
       {showEstadoModal && (
         <div className="modal-overlay">
@@ -412,7 +423,7 @@ export default function AdminPaquetes() {
           </div>
         </div>
       )}
-
+ 
       {/* Modal asignar solicitud a operador */}
       {showAsignarModal && (
         <div className="modal-overlay">
@@ -430,7 +441,7 @@ export default function AdminPaquetes() {
                 </span>
               </div>
             </div>
-
+ 
             <div className="form-group">
               <label className="form-label">Operador *</label>
               <select className="form-input" value={asignarForm.operador_id}
@@ -443,14 +454,14 @@ export default function AdminPaquetes() {
                 ))}
               </select>
             </div>
-
+ 
             <div className="form-group">
               <label className="form-label">Notas para el operador</label>
               <textarea className="form-input" rows={2} placeholder="Instrucciones especiales, dirección de referencia..."
                 value={asignarForm.notas_admin} onChange={e => setAsignarForm(f => ({ ...f, notas_admin: e.target.value }))}
                 style={{ resize: 'vertical' }} />
             </div>
-
+ 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setShowAsignarModal(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={asignarSolicitud}>👷 Asignar operador</button>
@@ -458,7 +469,7 @@ export default function AdminPaquetes() {
           </div>
         </div>
       )}
-
+ 
       {/* Modal vincular paquete a ruta */}
       {showVincularModal && (
         <div className="modal-overlay">
@@ -467,7 +478,7 @@ export default function AdminPaquetes() {
               <span className="modal-title">🔗 Vincular paquete a ruta</span>
               <button className="modal-close" onClick={() => { setShowVincularModal(null); setPuntosRuta([]); setVincularForm({ ruta_id: '', punto_parada_id: '' }); }}>×</button>
             </div>
-
+ 
             {/* Package info */}
             <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
               <strong style={{ fontFamily: 'var(--mono)' }}>{showVincularModal.codigo_seguimiento}</strong>
@@ -476,7 +487,7 @@ export default function AdminPaquetes() {
                 Cliente: {showVincularModal.cliente_nombre} {showVincularModal.cliente_apellido}
               </div>
             </div>
-
+ 
             {/* Route selector */}
             <div className="form-group">
               <label className="form-label">Seleccionar ruta *</label>
@@ -503,14 +514,14 @@ export default function AdminPaquetes() {
                 </select>
               )}
             </div>
-
+ 
             {/* Loading indicator */}
             {vincularForm.ruta_id && puntosRuta.length === 0 && (
               <div style={{ fontSize: 12, color: 'var(--text2)', padding: '8px 0', textAlign: 'center' }}>
                 ⏳ Cargando puntos de parada...
               </div>
             )}
-
+ 
             {/* Punto selector — show ALL puntos with their state */}
             {puntosRuta.length > 0 && (
               <div className="form-group">
@@ -531,7 +542,7 @@ export default function AdminPaquetes() {
                 )}
               </div>
             )}
-
+ 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
               <button className="btn btn-secondary" onClick={() => { setShowVincularModal(null); setPuntosRuta([]); setVincularForm({ ruta_id: '', punto_parada_id: '' }); }}>
                 Cancelar

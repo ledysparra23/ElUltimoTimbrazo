@@ -1,5 +1,5 @@
 const db = require('../config/db');
-
+ 
 const getUsers = async (req, res) => {
   try {
     const { rol } = req.query;
@@ -13,7 +13,7 @@ const getUsers = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener usuarios' });
   }
 };
-
+ 
 const getOperadores = async (req, res) => {
   try {
     const result = await db.query(`
@@ -31,7 +31,7 @@ const getOperadores = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener operadores' });
   }
 };
-
+ 
 const getClientes = async (req, res) => {
   try {
     const result = await db.query(`
@@ -49,7 +49,7 @@ const getClientes = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener clientes' });
   }
 };
-
+ 
 const getZonas = async (req, res) => {
   try {
     const result = await db.query(`SELECT * FROM zonas WHERE activa = true ORDER BY nombre`);
@@ -58,7 +58,7 @@ const getZonas = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener zonas' });
   }
 };
-
+ 
 const crearZona = async (req, res) => {
   try {
     const { nombre, descripcion, poligono } = req.body;
@@ -71,7 +71,7 @@ const crearZona = async (req, res) => {
     return res.status(500).json({ error: 'Error al crear zona' });
   }
 };
-
+ 
 const toggleUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -85,12 +85,12 @@ const toggleUser = async (req, res) => {
     return res.status(500).json({ error: 'Error al actualizar usuario' });
   }
 };
-
+ 
 const getMisPaquetes = async (req, res) => {
   try {
     const clRes = await db.query('SELECT id FROM clientes WHERE user_id = $1', [req.user.id]);
     if (!clRes.rows[0]) return res.status(404).json({ error: 'Perfil cliente no encontrado' });
-
+ 
     const result = await db.query(`
       SELECT pk.*,
         p.direccion AS punto_direccion, p.estado AS punto_estado,
@@ -104,7 +104,7 @@ const getMisPaquetes = async (req, res) => {
       WHERE pk.cliente_id = $1
       ORDER BY pk.creado_en DESC
     `, [clRes.rows[0].id]);
-
+ 
     return res.json(result.rows.map(p => ({
       ...p,
       puntos_parada: {
@@ -117,19 +117,27 @@ const getMisPaquetes = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener paquetes' });
   }
 };
-
+ 
 const getMisNotificaciones = async (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT * FROM notificaciones WHERE user_id = $1 ORDER BY creado_en DESC LIMIT 50`,
-      [req.user.id]
-    );
+    const { historial } = req.query;
+    let query, params;
+    if (historial === 'true') {
+      // Historial: return ALL notifications (read + unread), last 100
+      query = `SELECT * FROM notificaciones WHERE user_id = $1 ORDER BY creado_en DESC LIMIT 100`;
+      params = [req.user.id];
+    } else {
+      // Default: only unread notifications
+      query = `SELECT * FROM notificaciones WHERE user_id = $1 AND leida = false ORDER BY creado_en DESC LIMIT 50`;
+      params = [req.user.id];
+    }
+    const result = await db.query(query, params);
     return res.json(result.rows);
   } catch (err) {
     return res.status(500).json({ error: 'Error al obtener notificaciones' });
   }
 };
-
+ 
 const marcarLeida = async (req, res) => {
   try {
     const { id } = req.params;
@@ -142,7 +150,16 @@ const marcarLeida = async (req, res) => {
     return res.status(500).json({ error: 'Error' });
   }
 };
-
+ 
+const marcarTodasLeidas = async (req, res) => {
+  try {
+    await db.query(`UPDATE notificaciones SET leida = true WHERE user_id = $1`, [req.user.id]);
+    return res.json({ message: 'Todas las notificaciones marcadas como leídas' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Error' });
+  }
+};
+ 
 // ── Update user settings (2FA toggle) ──────────────────────────────
 const updateSettings = async (req, res) => {
   try {
@@ -155,7 +172,7 @@ const updateSettings = async (req, res) => {
     return res.status(500).json({ error: 'Error al guardar configuración' });
   }
 };
-
+ 
 // ── Update user profile (nombre, apellido, avatar_color) ─────────────
 const updateProfile = async (req, res) => {
   try {
@@ -180,5 +197,57 @@ const updateProfile = async (req, res) => {
     return res.status(500).json({ error: 'Error al actualizar perfil' });
   }
 };
-
-module.exports = { getUsers, getOperadores, getClientes, getZonas, crearZona, toggleUser, getMisPaquetes, getMisNotificaciones, marcarLeida, updateSettings, updateProfile };
+ 
+ 
+// ── Admin: update user ────────────────────────────────────────────────
+const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, apellido, email, password, rol, telefono, direccion } = req.body;
+    const updates = [];
+    const params = [];
+    if (nombre) { updates.push(`nombre = $${params.length + 1}`); params.push(nombre); }
+    if (apellido) { updates.push(`apellido = $${params.length + 1}`); params.push(apellido); }
+    if (email) { updates.push(`email = $${params.length + 1}`); params.push(email); }
+    if (rol && ['admin', 'operador', 'cliente'].includes(rol)) {
+      updates.push(`rol = $${params.length + 1}`); params.push(rol);
+    }
+    if (password) {
+      const bcrypt = require('bcryptjs');
+      const hash = await bcrypt.hash(password, 10);
+      updates.push(`password_hash = $${params.length + 1}`); params.push(hash);
+    }
+    if (updates.length > 0) {
+      params.push(id);
+      await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length}`, params);
+    }
+    // Update profile tables
+    if (telefono || direccion) {
+      await db.query(`UPDATE clientes SET telefono = COALESCE($1, telefono), direccion = COALESCE($2, direccion) WHERE user_id = $3`,
+        [telefono || null, direccion || null, id]);
+      await db.query(`UPDATE operadores SET telefono = COALESCE($1, telefono) WHERE user_id = $2`,
+        [telefono || null, id]).catch(() => {});
+    }
+    return res.json({ message: 'Usuario actualizado' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al actualizar usuario' });
+  }
+};
+ 
+// ── Admin: delete user ────────────────────────────────────────────────
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await db.query('SELECT rol FROM users WHERE id = $1', [id]);
+    if (!check.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (check.rows[0].rol === 'admin') return res.status(403).json({ error: 'No puedes eliminar un admin' });
+    await db.query('DELETE FROM users WHERE id = $1', [id]);
+    return res.json({ message: 'Usuario eliminado' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al eliminar usuario' });
+  }
+};
+ 
+module.exports = { getUsers, getOperadores, getClientes, getZonas, crearZona, toggleUser, getMisPaquetes, getMisNotificaciones, marcarLeida, marcarTodasLeidas, updateSettings, updateProfile, updateUser, deleteUser };

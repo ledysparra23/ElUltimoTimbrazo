@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import SettingsPage from './pages/shared/Settings';
+import NotificacionesHistorial from './pages/shared/Notificaciones';
 
 // Admin
 import AdminDashboard from './pages/admin/Dashboard';
@@ -12,8 +13,9 @@ import AdminCiclos from './pages/admin/Ciclos';
 import AdminOperadores from './pages/admin/Operadores';
 import AdminClientes from './pages/admin/Clientes';
 import AdminMapa from './pages/admin/Mapa';
-import { AdminReporte } from './pages/admin/Clientes';
+import AdminReporte from './pages/admin/Reporte';
 import AdminPaquetes from './pages/admin/Paquetes';
+import AdminUsuarios from './pages/admin/Usuarios';
 
 // Operador
 import OperadorDashboard from './pages/operador/Dashboard';
@@ -61,6 +63,8 @@ export default function App() {
         <Route path="mapa" element={<AdminMapa />} />
         <Route path="reporte" element={<AdminReporte />} />
         <Route path="paquetes" element={<AdminPaquetes />} />
+        <Route path="usuarios" element={<AdminUsuarios />} />
+        <Route path="notificaciones" element={<NotificacionesHistorial />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
@@ -70,6 +74,7 @@ export default function App() {
         <Route path="ruta/:id" element={<OperadorRuta />} />
         <Route path="historial" element={<OperadorHistorial />} />
         <Route path="mapa" element={<OperadorMapa />} />
+        <Route path="notificaciones" element={<NotificacionesHistorial />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
@@ -79,6 +84,7 @@ export default function App() {
         <Route path="paquetes" element={<ClientePaquetes />} />
         <Route path="seguimiento" element={<ClienteSeguimiento />} />
         <Route path="solicitudes" element={<ClienteSolicitudes />} />
+        <Route path="notificaciones" element={<NotificacionesHistorial />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
